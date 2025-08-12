@@ -17,7 +17,8 @@ public class MainActivity : MauiAppCompatActivity, ISensorEventListener
 {
     SensorManager? sensorManager;
     Sensor? stepSensor;
-    static int stepCount = 0;
+    private int initialStepCount = -1;
+    private int currentStepCount = 0;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -25,11 +26,12 @@ public class MainActivity : MauiAppCompatActivity, ISensorEventListener
 
         sensorManager = (SensorManager?)GetSystemService(SensorService);
         stepSensor = sensorManager?.GetDefaultSensor(SensorType.StepCounter);
+        
         if (Build.VERSION.SdkInt >= BuildVersionCodes.Q)
         {
             if (CheckSelfPermission(Android.Manifest.Permission.ActivityRecognition) != Permission.Granted)
             {
-                RequestPermissions(new string[] { Android.Manifest.Permission.ActivityRecognition }, -1);
+                RequestPermissions(new string[] { Android.Manifest.Permission.ActivityRecognition }, 1001);
             }
         }
     }
@@ -37,7 +39,11 @@ public class MainActivity : MauiAppCompatActivity, ISensorEventListener
     protected override void OnResume()
     {
         base.OnResume();
-        sensorManager?.RegisterListener(this, stepSensor, SensorDelay.Ui);    }
+        if (stepSensor != null)
+        {
+            sensorManager?.RegisterListener(this, stepSensor, SensorDelay.Ui);
+        }
+    }
 
     protected override void OnPause()
     {
@@ -49,14 +55,24 @@ public class MainActivity : MauiAppCompatActivity, ISensorEventListener
 
     public void OnSensorChanged(SensorEvent? e)
     {
-        if (e?.Sensor?.Type == SensorType.StepCounter)
+        if (e?.Sensor?.Type == SensorType.StepCounter && e.Values != null && e.Values.Count > 0)
         {
-            var stepCount = (int)e.Values[0];
+            int totalSteps = (int)e.Values[0];
+            
+            if (initialStepCount == -1)
+            {
+                initialStepCount = totalSteps;
+                currentStepCount = 0;
+            }
+            else
+            {
+                currentStepCount = totalSteps - initialStepCount;
+            }
+
             MainThread.BeginInvokeOnMainThread(() =>
             {
-                MessagingCenter.Send<object, int>(this, "StepUpdated", stepCount);
+                Microsoft.Maui.Controls.MessagingCenter.Send<object, int>(this, "StepUpdated", currentStepCount);
             });
         }
     }
-
 }
